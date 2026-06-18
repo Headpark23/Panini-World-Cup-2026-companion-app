@@ -1,0 +1,10 @@
+{
+  "name": "Panini Sticker Companion",
+  "description": "An exhaustive physical Panini sticker album companion tracker featuring Gemini AI photo scanner to auto sort owned cards, doubles, and compute Coupon Collector completion pack statistics.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
