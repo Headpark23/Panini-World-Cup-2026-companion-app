@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Sparkles, Share2, Info, BookOpen, Layers, Trophy, AlertCircle, Copy, Check, Users, Home, Camera } from "lucide-react";
+import { Sparkles, Share2, Info, BookOpen, Layers, Trophy, AlertCircle, Copy, Check, Users, Home, Camera, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Sticker } from "./types";
 import { INITIAL_STICKERS } from "./data/stickers";
@@ -12,6 +12,12 @@ import DashboardHome from "./components/DashboardHome";
 import NeedView from "./components/NeedView";
 import DoublesView from "./components/DoublesView";
 import GotView from "./components/GotView";
+
+// Firebase imports
+import { auth, db } from "./lib/firebase";
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import AuthModal from "./components/AuthModal";
 
 export default function App() {
   const [stickers, setStickers] = useState<Sticker[]>(() => {
@@ -29,6 +35,56 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "album" | "need" | "doubles" | "got" | "camera" | "share">("dashboard");
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const [pwaPrompt, setPwaPrompt] = useState<any>(null);
+
+  // Authentication & Cloud states
+  const [user, setUser] = useState<User | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [isCloudLoading, setIsCloudLoading] = useState(false);
+
+  // Firebase auth state listener & state restoration
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        setIsCloudLoading(true);
+        try {
+          const docRef = doc(db, "users", currentUser.uid, "tracker", "state");
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const cloudMap = data.stickersMap || {};
+            // Merge cloud keys over INITIAL_STICKERS to form absolute sticker list
+            const merged = INITIAL_STICKERS.map((s) => {
+              const cloudState = cloudMap[s.id];
+              if (cloudState) {
+                return {
+                  ...s,
+                  ownedStatus: cloudState.ownedStatus,
+                  doublesCount: cloudState.doublesCount,
+                };
+              }
+              return {
+                ...s,
+                ownedStatus: "needed" as const,
+                doublesCount: 0,
+              };
+            });
+            setStickers(merged);
+            console.log("Stickers state restored successfully from Firestore!");
+          } else {
+            console.log("No cloud tracking session existed yet. Initial progress will back up automatically.");
+          }
+        } catch (err) {
+          console.error("Failed to restore stickers from Firestore:", err);
+        } finally {
+          setIsCloudLoading(false);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Monitor and capture standard PWA install prompt event
   useEffect(() => {
@@ -50,6 +106,42 @@ export default function App() {
       console.error("Failed saving stickers to localStorage:", e);
     }
   }, [stickers]);
+
+  // Sync to Cloud Firestore when stickers or user changes (debounced by 1s)
+  useEffect(() => {
+    if (!user) return;
+
+    const saveToCloud = async () => {
+      try {
+        const docRef = doc(db, "users", user.uid, "tracker", "state");
+        const cloudStateMap: Record<string, { ownedStatus: string; doublesCount: number }> = {};
+        
+        stickers.forEach((s) => {
+          if (s.ownedStatus === "owned" || s.doublesCount > 0) {
+            cloudStateMap[s.id] = {
+              ownedStatus: s.ownedStatus,
+              doublesCount: s.doublesCount,
+            };
+          }
+        });
+
+        await setDoc(docRef, {
+          userId: user.uid,
+          updatedAt: new Date().toISOString(),
+          stickersMap: cloudStateMap,
+        });
+        console.log("Stickers successfully synced to Cloud Firestore.");
+      } catch (err) {
+        console.error("Error saving stickers to Firestore", err);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      saveToCloud();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [stickers, user]);
 
   // Handle manual sticker owned toggler
   const handleToggleSticker = (id: string) => {
@@ -498,6 +590,60 @@ Let's trade physical stickers and fill our albums together! 🤝`;
             <span>📤 Share</span>
           </button>
         </div>
+
+        {/* CLOUD SYNC & AUTH STATUS BAR */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-[#110720]/95 border border-purple-500/20 p-3.5 rounded-2xl shadow-xl text-xs" id="cloud-sync-status-bar">
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-3 w-3 shrink-0">
+              {isCloudLoading ? (
+                <span className="animate-spin rounded-full h-3 w-3 border border-purple-500 border-t-transparent"></span>
+              ) : (
+                <>
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${user ? "bg-emerald-400" : "bg-amber-400"}`}></span>
+                  <span className={`relative inline-flex rounded-full h-3 w-3 ${user ? "bg-emerald-500" : "bg-amber-500"}`}></span>
+                </>
+              )}
+            </div>
+            <span className="font-mono text-slate-300 flex items-center gap-1.5 flex-wrap">
+              {isCloudLoading ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+                  <span>Synchronizing collections with Secure Cloud database...</span>
+                </>
+              ) : user ? (
+                <>
+                  <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Cloud Backup Active: <strong className="text-emerald-400">{user.email}</strong></span>
+                </>
+              ) : (
+                <>
+                  <CloudOff className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>Device Offline Storage Active • <span className="text-amber-300/90 font-bold">Log in to save data across all your devices &amp; avoid data loss!</span></span>
+                </>
+              )}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            {user ? (
+              <button
+                type="button"
+                onClick={() => signOut(auth)}
+                className="w-full sm:w-auto bg-red-500/10 hover:bg-red-500/20 text-red-300 font-bold font-mono px-3 py-1.5 rounded-xl border border-red-500/20 text-[10px] uppercase tracking-wider transition-all cursor-pointer"
+              >
+                Sign Out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-black uppercase tracking-wider px-4 py-2 rounded-xl border border-purple-400/20 transition-all cursor-pointer shadow-lg shadow-purple-500/10 text-[10px]"
+              >
+                🔑 Log In or Sign Up
+              </button>
+            )}
+          </div>
+        </div>
         
         {/* CONDITIONAL RENDERING OF THE DASHBOARD LANDING OR THE SUB-SECTION HEADER */}
         {activeTab === "dashboard" ? (
@@ -780,6 +926,9 @@ Let's trade physical stickers and fill our albums together! 🤝`;
         <footer className="text-center text-[11px] text-slate-500 font-bold uppercase tracking-wider py-8 border-t border-purple-500/10 animate-pulse" id="copyright-footer">
           <p>© Martin White 2026 • Ported Companion App</p>
         </footer>
+
+        {/* AUTHENTICATION FLOW MODAL */}
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
 
       </div>
     </div>

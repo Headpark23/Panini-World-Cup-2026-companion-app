@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account meta information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    },
+    "TrackerState": {
+      "title": "Tracker State",
+      "description": "The user's sticker possession tracking dictionary containing status and double counts",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "stickersMap": {
+          "type": "object",
+          "description": "Key is sticker ID, value is object containing ownedStatus and doublesCount"
+        }
+      },
+      "required": ["userId", "updatedAt", "stickersMap"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "The custom user profiles collection"
+    },
+    "/users/{userId}/tracker/state": {
+      "schema": "TrackerState",
+      "description": "Store the user panini World Cup album stickers tracking map"
+    }
+  }
+}
