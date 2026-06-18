@@ -3,6 +3,7 @@ import { Search, Trophy, Layers } from "lucide-react";
 import { Sticker } from "../types";
 import { TEAMS } from "../data/stickers";
 import StickerCard from "./StickerCard";
+import IntelligentBatchPanel from "./IntelligentBatchPanel";
 
 interface GotViewProps {
   stickers: Sticker[];
@@ -16,8 +17,6 @@ export default function GotView({ stickers, onToggleSticker, onBatchUpdateStatus
 
   // Batch importer state
   const [showBatch, setShowBatch] = useState(false);
-  const [batchText, setBatchText] = useState("");
-  const [batchFeedback, setBatchFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const teamOptions = useMemo(() => {
     return Object.keys(TEAMS).map((code) => ({
@@ -62,7 +61,6 @@ export default function GotView({ stickers, onToggleSticker, onBatchUpdateStatus
                 id="toggle-got-batch"
                 onClick={() => {
                   setShowBatch(!showBatch);
-                  setBatchFeedback(null);
                 }}
                 className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-black px-3.5 py-1.5 rounded-xl cursor-pointer shadow transition-all flex items-center gap-1.5 uppercase tracking-wide"
               >
@@ -107,96 +105,13 @@ export default function GotView({ stickers, onToggleSticker, onBatchUpdateStatus
           </div>
         </div>
 
-        {/* BATCH IMPORTER COLLAPSIBLE PANEL */}
         {showBatch && (
-          <div className="mb-6 p-5 rounded-2xl bg-gradient-to-br from-[#120624] to-[#04010a] border border-purple-500/20 shadow-2xl relative overflow-hidden animate-fadeIn" id="got-batch-importer-panel">
-            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-2 flex items-center gap-2 text-pink-400">
-              ⚡ Paste Batch Acquired/Owned stickers
-            </h3>
-            <p className="text-xs text-slate-300 mb-3 leading-relaxed">
-              💡 <strong>How to use:</strong> Use <strong>3 letters</strong> for the country / team code, then the sticker number (e.g. <code className="bg-pink-500/20 text-pink-400 px-1.5 py-0.5 rounded font-mono font-bold">JAP3</code>, <code className="bg-pink-500/20 text-pink-400 px-1.5 py-0.5 rounded font-mono font-bold">ARG14</code>, <code className="bg-pink-500/20 text-pink-400 px-1.5 py-0.5 rounded font-mono font-bold">SCO7</code>). Separate each piece using a <strong>new line</strong> or a <strong>semi-colon (;)</strong>.
-            </p>
-            <textarea
-              value={batchText}
-              onChange={(e) => setBatchText(e.target.value)}
-              placeholder="JAP3; ARG14; SCO7&#10;ENG10; BRA2"
-              rows={4}
-              className="w-full bg-[#05010f] border border-purple-500/30 text-white rounded-xl p-3.5 text-xs focus:outline-none focus:border-pink-500 font-mono transition-colors"
-            />
-            <div className="mt-3 flex items-center justify-between gap-4 flex-wrap">
-              <button
-                onClick={() => {
-                  const tokens = batchText.split(/[\n;,]+/);
-                  const validIds: string[] = [];
-                  const invalidInputs: string[] = [];
-                  const allStickerIds = new Set(stickers.map((s) => s.id));
-
-                  tokens.forEach((t) => {
-                    const clean = t.trim().toUpperCase();
-                    if (!clean) return;
-                    const match = clean.match(/^([A-Z]{2,3})\s*[-_]?\s*(\d+)$/);
-                    if (match) {
-                      let teamCode = match[1];
-                      const numberStr = match[2];
-                      if (teamCode === "JAP") {
-                        teamCode = "JPN";
-                      }
-                      const officialId = `${teamCode} ${parseInt(numberStr, 10)}`;
-                      if (allStickerIds.has(officialId)) {
-                        validIds.push(officialId);
-                      } else {
-                        invalidInputs.push(clean);
-                      }
-                    } else {
-                      invalidInputs.push(clean);
-                    }
-                  });
-
-                  if (validIds.length > 0) {
-                    onBatchUpdateStatus(validIds, "owned");
-                    setBatchFeedback({
-                      type: "success",
-                      text: `🎉 Successfully marked ${validIds.length} stickers as acquired/owned in your book!${
-                        invalidInputs.length > 0
-                          ? ` (Skipped ${invalidInputs.length} unrecognized matches: ${invalidInputs.slice(0, 5).join(", ")})`
-                          : ""
-                      }`,
-                    });
-                    setBatchText("");
-                  } else {
-                    setBatchFeedback({
-                      type: "error",
-                      text: "⚠️ No recognized sticker codes found. Verify you are using 3-letter codes followed by a number (e.g. JAP3, ARG14, SCO7).",
-                    });
-                  }
-                }}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-black text-xs uppercase px-5 py-2.5 rounded-xl transition-all hover:scale-[1.01] active:scale-95 cursor-pointer shadow-lg"
-              >
-                Apply Batch to Acquired Deck
-              </button>
-              <button
-                onClick={() => {
-                  setShowBatch(false);
-                  setBatchText("");
-                  setBatchFeedback(null);
-                }}
-                className="text-xs text-slate-400 hover:text-white cursor-pointer font-bold"
-              >
-                Cancel / Close
-              </button>
-            </div>
-            {batchFeedback && (
-              <div
-                className={`mt-4 p-3 rounded-xl text-xs font-semibold ${
-                  batchFeedback.type === "success"
-                    ? "bg-emerald-950/40 border border-emerald-500/20 text-emerald-400"
-                    : "bg-red-950/40 border border-red-500/20 text-rose-400"
-                }`}
-              >
-                {batchFeedback.text}
-              </div>
-            )}
-          </div>
+          <IntelligentBatchPanel
+            stickers={stickers}
+            onBatchUpdateStatus={onBatchUpdateStatus}
+            targetStatus="owned"
+            onClose={() => setShowBatch(false)}
+          />
         )}
 
         {ownedStickers.length > 0 ? (

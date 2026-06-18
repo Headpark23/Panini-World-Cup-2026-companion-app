@@ -7,9 +7,10 @@ import { LogIn, UserPlus, X, AlertCircle } from "lucide-react";
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  isDismissible?: boolean;
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, isDismissible = true }: AuthModalProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,19 +59,21 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         className="w-full max-w-md bg-gradient-to-b from-[#160b2d] to-[#0a0515] border-2 border-purple-500/30 rounded-3xl p-6 shadow-2xl relative"
         id="auth-modal-content"
       >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition duration-150 cursor-pointer"
-          id="close-auth-modal"
-          aria-label="Close modal"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {isDismissible && (
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 p-2 rounded-xl transition duration-150 cursor-pointer"
+            id="close-auth-modal"
+            aria-label="Close modal"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
 
         <div className="text-center mb-6 mt-2">
           <div className="text-4xl mb-2">🏆</div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-            {isSignUp ? "Create Collector Account" : "Sign In to Album"}
+            {isSignUp ? "Create Collector Account" : "Sign in to Panini World Cup 2026 sticker companion app"}
           </h2>
           <p className="text-xs text-purple-300 mt-1">
             {isSignUp

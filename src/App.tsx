@@ -40,6 +40,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [isCloudLoading, setIsCloudLoading] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   // Firebase auth state listener & state restoration
   useEffect(() => {
@@ -79,7 +80,13 @@ export default function App() {
           console.error("Failed to restore stickers from Firestore:", err);
         } finally {
           setIsCloudLoading(false);
+          setIsAuthChecking(false);
         }
+      } else {
+        // Safe clear of local stickers to fallback on logout or anonymous state
+        setStickers(INITIAL_STICKERS);
+        setIsCloudLoading(false);
+        setIsAuthChecking(false);
       }
     });
 
@@ -100,12 +107,13 @@ export default function App() {
 
   // Sync to localstorage
   useEffect(() => {
+    if (!user) return;
     try {
       localStorage.setItem("panini_stickers_v2", JSON.stringify(stickers));
     } catch (e) {
       console.error("Failed saving stickers to localStorage:", e);
     }
-  }, [stickers]);
+  }, [stickers, user]);
 
   // Sync to Cloud Firestore when stickers or user changes (debounced by 1s)
   useEffect(() => {
@@ -145,6 +153,7 @@ export default function App() {
 
   // Handle manual sticker owned toggler
   const handleToggleSticker = (id: string) => {
+    if (!user) return;
     setStickers((prev) =>
       prev.map((s) => {
         if (s.id === id) {
@@ -163,6 +172,7 @@ export default function App() {
 
   // Handle increment swap count
   const handleIncrementDouble = (id: string) => {
+    if (!user) return;
     setStickers((prev) =>
       prev.map((s) => (s.id === id ? { ...s, doublesCount: s.doublesCount + 1 } : s))
     );
@@ -170,6 +180,7 @@ export default function App() {
 
   // Handle decrement swap count
   const handleDecrementDouble = (id: string) => {
+    if (!user) return;
     setStickers((prev) =>
       prev.map((s) =>
         s.id === id ? { ...s, doublesCount: Math.max(0, s.doublesCount - 1) } : s
@@ -179,6 +190,7 @@ export default function App() {
 
   // Process stickers recognized by the AI Photo scan
   const handleStickersScanned = (detectedIds: string[]) => {
+    if (!user) return;
     setStickers((prev) => {
       return prev.map((s) => {
         if (detectedIds.includes(s.id)) {
@@ -199,6 +211,7 @@ export default function App() {
 
   // Handle batch sticker status updates
   const handleBatchUpdateStatus = (detectedIds: string[], targetStatus: "owned" | "needed") => {
+    if (!user) return;
     setStickers((prev) =>
       prev.map((s) => {
         if (detectedIds.includes(s.id)) {
@@ -499,6 +512,54 @@ Let's trade physical stickers and fill our albums together! 🤝`;
     // Standard beautiful offline HTML app backup one-click companion download
     downloadOfflineApp();
   };
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#07070a] text-slate-100 flex flex-col items-center justify-center p-8 font-sans" id="loading-spinner-screen">
+        <div className="relative flex flex-col items-center">
+          <div className="absolute w-24 h-24 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin"></div>
+          <div className="w-24 h-24 rounded-full flex items-center justify-center text-4xl">🏆</div>
+          <p className="mt-8 text-sm font-bold uppercase tracking-widest text-purple-400 font-mono animate-pulse">Initializing Panini Album...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#07070a] text-slate-100 flex items-center justify-center p-4 md:p-8 font-sans relative overflow-hidden" id="logged-out-gate">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] pointer-events-none" />
+        
+        <div className="w-full max-w-lg text-center space-y-6 z-10 p-6 bg-gradient-to-b from-[#13082a] to-[#080312] border-2 border-purple-500/20 rounded-3xl shadow-2xl relative">
+          <div className="w-20 h-20 bg-gradient-to-tr from-purple-600 via-pink-600 to-amber-500 rounded-2xl mx-auto flex items-center justify-center text-4xl shadow-2xl animate-bounce">
+            🏆
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl md:text-4xl font-extrabold text-white uppercase tracking-tight">
+              Panini Companion
+            </h1>
+            <p className="text-sm text-purple-300 font-mono font-bold uppercase tracking-widest">
+              Secured Cloud Album
+            </p>
+          </div>
+          <p className="text-slate-400 text-xs leading-relaxed max-w-sm mx-auto">
+            Please log in or register a new collector account below to start adding, scanning, and managing your football sticker data.
+          </p>
+          
+          <div className="pt-2">
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="w-full bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 hover:from-purple-500 hover:via-pink-500 hover:to-amber-400 text-white font-black text-xs uppercase p-4 rounded-2xl transition duration-150 flex items-center justify-center gap-2 tracking-wider shadow-lg shadow-purple-500/15 cursor-pointer"
+            >
+              🔑 Sign In or Get Access
+            </button>
+          </div>
+        </div>
+        
+        <AuthModal isOpen={authModalOpen || !user} onClose={() => setAuthModalOpen(false)} isDismissible={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#07070a] text-slate-100 font-sans p-4 md:p-8 selection:bg-amber-400 selection:text-black animate-fadeIn" id="app-wrapper">
@@ -928,7 +989,7 @@ Let's trade physical stickers and fill our albums together! 🤝`;
         </footer>
 
         {/* AUTHENTICATION FLOW MODAL */}
-        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} isDismissible={!!user} />
 
       </div>
     </div>

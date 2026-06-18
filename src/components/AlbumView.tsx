@@ -163,7 +163,7 @@ function StickersCollectionGrid({
                   onClick={() => onToggle(sticker.id)}
                   className="mt-1 text-center py-0.5 rounded-lg bg-slate-900/80 hover:bg-emerald-500/15 hover:text-emerald-350 hover:border-emerald-555/20 border border-slate-805 text-[8.5px] font-black uppercase text-slate-400 transition-all cursor-pointer"
                 >
-                  ➕ Paste
+                  ➕ Got Sticker
                 </button>
               )}
             </div>
