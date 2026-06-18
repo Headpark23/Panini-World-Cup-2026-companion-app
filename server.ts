@@ -1,17 +1,22 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Initialize Gemini SDK with apiKey and httpOptions telemetries
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
-});
+// Lazy initializer for Gemini SDK with apiKey and httpOptions telemetries
+let aiClient: GoogleGenAI | null = null;
+function getAi(): GoogleGenAI {
+  if (!aiClient) {
+    aiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return aiClient;
+}
 
 async function startServer() {
   const app = express();
@@ -67,7 +72,7 @@ Return a clean list of detected sticker codes in the JSON format.`,
       };
 
       // Call Gemini 3.5 Flash Model
-      const response = await ai.models.generateContent({
+      const response = await getAi().models.generateContent({
         model: "gemini-3.5-flash",
         contents: { parts: [imagePart, promptPart] },
         config: {
@@ -115,18 +120,57 @@ Return a clean list of detected sticker codes in the JSON format.`,
   });
 
   // Hot-reloading and static routing depending on NODE_ENV
-  if (process.env.NODE_ENV !== "production") {
+  let isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
+    try {
+      const currentRef = typeof __filename !== "undefined" ? __filename : "";
+      if (currentRef && !currentRef.endsWith("server.ts")) {
+        isProd = true;
+      }
+    } catch (e) {
+      // Safe fallback
+    }
+  }
+
+  if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
+    // Highly resilient static path resolver for production (works with standard cwd or dist/server.cjs)
+    let distPath = path.join(process.cwd(), "dist");
+    try {
+      if (typeof __dirname !== "undefined") {
+        if (__dirname.endsWith("dist") || __dirname.includes("/dist")) {
+          distPath = __dirname;
+        } else {
+          distPath = path.join(__dirname, "dist");
+        }
+      }
+    } catch (err) {
+      console.warn("Could not compute __dirname fallback, using default process.cwd() distPath");
+    }
+
+    console.log(`Production static file path resolved to: ${distPath}`);
     app.use(express.static(distPath));
     // Serve index.html as spa fallback
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const indexPath = path.join(distPath, "index.html");
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error(`Error sending index.html from ${indexPath}:`, err);
+          // Try a quick fallback to process.cwd() / dist / index.html
+          const fallbackPath = path.join(process.cwd(), "dist", "index.html");
+          res.sendFile(fallbackPath, (fallbackErr) => {
+            if (fallbackErr) {
+              res.status(404).send("Error: Page not found. The app could not find index.html.");
+            }
+          });
+        }
+      });
     });
   }
 
