@@ -293,6 +293,25 @@ Let's trade physical stickers and fill our albums together! 🤝`;
     window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
   };
 
+  const handleShareAppWhatsApp = () => {
+    const appUrl = window.location.origin;
+    const text = `🏆 Track, scan, and swap stickers with the Panini World Cup 2026 Sticker Companion App! ⚽ Access it here: ${appUrl}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  const handleShareAppText = () => {
+    const appUrl = window.location.origin;
+    const text = `🏆 Track, scan, and swap stickers with the Panini World Cup 2026 Sticker Companion App! ⚽ Access it here: ${appUrl}`;
+    window.open(`sms:?body=${encodeURIComponent(text)}`, "_self");
+  };
+
+  const handleShareAppEmail = () => {
+    const appUrl = window.location.origin;
+    const subject = encodeURIComponent("🏆 Panini World Cup 2026 Sticker Companion App!");
+    const body = encodeURIComponent(`Check out the Panini World Cup 2026 Sticker Companion App! Collect, scan (with smart AI photo detection), and track your stickers and doubles on the go: ${appUrl}`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_self");
+  };
+
   const downloadOfflineApp = () => {
     const total = stickers.length;
     const ownedCount = stickers.filter((s) => s.ownedStatus === "owned").length;
@@ -954,31 +973,31 @@ Let's trade physical stickers and fill our albums together! 🤝`;
             {/* WHATSAPP SHARE */}
             <button
               id="share-whatsapp-btn"
-              onClick={handleShareWhatsApp}
+              onClick={handleShareAppWhatsApp}
               className="bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-xs uppercase p-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md select-none"
             >
               <span className="text-sm">💬</span>
-              <span>Share via WhatsApp</span>
+              <span>Share App via WhatsApp</span>
             </button>
 
             {/* SMS / TEXT SHARE */}
             <button
               id="share-text-btn"
-              onClick={handleShareText}
+              onClick={handleShareAppText}
               className="bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs uppercase p-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md select-none"
             >
               <span className="text-sm">📱</span>
-              <span>Share by Text (SMS)</span>
+              <span>Share App by Text (SMS)</span>
             </button>
 
             {/* EMAIL SHARE */}
             <button
               id="share-email-btn"
-              onClick={handleShareEmail}
+              onClick={handleShareAppEmail}
               className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase p-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md select-none"
             >
               <span className="text-sm">✉️</span>
-              <span>Share by Email</span>
+              <span>Share App by Email</span>
             </button>
           </div>
         </div>
